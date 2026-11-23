@@ -49,6 +49,6 @@
   "pendulum.mcp.tool.hover.param.y": "Y in GUI coordinates (as in gui/enumerateWidgets; screenshot pixel / guiScale).",
   "pendulum.mcp.tool.scroll.param.x": "Optional X in GUI coordinates to scroll at.",
   "pendulum.mcp.tool.scroll.param.y": "Optional Y in GUI coordinates to scroll at.",
-  "pendulum.mcp.tool.window_raise": "Bring the game window in front of other windows now, without taking focus (the user's mouse and keyboard stay with their window; the next window they click goes in front again). Optional 'auto' sets whether this also happens when loading finishes and whenever an agent connects.",
-  "pendulum.mcp.tool.window_raise.param.auto": "true to also raise automatically on load and on agent connect, false to stop. Saved to the config."
+  "pendulum.mcp.tool.window_raise": "Bring the game window in front of other windows now, without taking focus (the user's mouse and keyboard stay with their window; the next window they click goes in front again). Only call this when the user asks to see the game. Optional 'auto' sets whether this also happens when loading finishes.",
+  "pendulum.mcp.tool.window_raise.param.auto": "true to also raise automatically when loading finishes, false to stop. Saved to the config."
 }

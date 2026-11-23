@@ -53,7 +53,7 @@ public final class FocusGuard {
         if (handle == 0) return;
 
         // "Bring game window to front" option: once when loading finishes, and on request
-        // (an agent connecting, or the window/raise tool).
+        // (the window/raise tool). Never on its own while an agent is driving the game.
         if (!raisedAfterLoad && mc.getOverlay() == null) {
             raisedAfterLoad = true;
             if (com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.raiseWindow.getValue()) raiseRequested = true;

@@ -82,5 +82,5 @@
   "pendulum.title.script_running": "脚本运行中",
   "pendulum.title.mcp_shared": "已与智能体共享",
   "pendulum.config.raise_window": "Bring Game Window to Front",
-  "pendulum.config.raise_window.tooltip": "When loading finishes and whenever an agent connects, move the game window in front of other windows without taking focus. Clicking another window puts that one in front again."
+  "pendulum.config.raise_window.tooltip": "When loading finishes, move the game window in front of other windows without taking focus. Clicking another window puts that one in front again."
 }

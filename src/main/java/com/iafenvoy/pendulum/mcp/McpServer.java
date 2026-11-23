@@ -101,8 +101,6 @@ public final class McpServer {
                 while (this.running.get()) {
                     try {
                         Socket client = this.serverSocket.accept();
-                        if (com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.raiseWindow.getValue())
-                            com.iafenvoy.pendulum.util.FocusGuard.requestRaise();
                         this.clientThreads.submit(() -> this.handleClient(client));
                     } catch (IOException e) {
                         if (this.running.get()) {
