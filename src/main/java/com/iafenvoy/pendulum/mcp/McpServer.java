@@ -101,6 +101,8 @@ public final class McpServer {
                 while (this.running.get()) {
                     try {
                         Socket client = this.serverSocket.accept();
+                        if (com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.raiseWindow.getValue())
+                            com.iafenvoy.pendulum.util.FocusGuard.requestRaise();
                         this.clientThreads.submit(() -> this.handleClient(client));
                     } catch (IOException e) {
                         if (this.running.get()) {
@@ -316,10 +318,10 @@ public final class McpServer {
                 jsonSchema("object",
                         jsonProperty("text", "string", I18n.get("pendulum.mcp.tool.select_list_item.param.text")))));
 
-        tools.add(makeTool("window/onTop",
-                I18n.get("pendulum.mcp.tool.window_on_top"),
+        tools.add(makeTool("window/raise",
+                I18n.get("pendulum.mcp.tool.window_raise"),
                 jsonSchema("object",
-                        jsonProperty("enabled", "boolean", I18n.get("pendulum.mcp.tool.window_on_top.param.enabled"), false))));
+                        jsonProperty("auto", "boolean", I18n.get("pendulum.mcp.tool.window_raise.param.auto"), false))));
 
         // ---- Utility ----
         tools.add(makeTool("wait",
@@ -563,13 +565,14 @@ public final class McpServer {
                     }
                     break;
                 }
-                case "window/onTop": {
-                    var entry = com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.windowOnTop;
-                    if (arguments.has("enabled")) {
-                        entry.setValue(arguments.get("enabled").getAsBoolean());
+                case "window/raise": {
+                    var entry = com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.raiseWindow;
+                    if (arguments.has("auto")) {
+                        entry.setValue(arguments.get("auto").getAsBoolean());
                         com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.save();
                     }
-                    content.add(textContent("{\"windowOnTop\":" + entry.getValue() + "}"));
+                    com.iafenvoy.pendulum.util.FocusGuard.requestRaise();
+                    content.add(textContent("{\"raised\":true,\"auto\":" + entry.getValue() + "}"));
                     break;
                 }
                 case "wait": {

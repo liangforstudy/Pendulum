@@ -81,6 +81,6 @@
   "pendulum.config.allow_attack.tooltip": "Allow scripts to attack entities.",
   "pendulum.title.script_running": "Script Running",
   "pendulum.title.mcp_shared": "Shared with AI Agent",
-  "pendulum.config.window_on_top": "Game Window on Top",
-  "pendulum.config.window_on_top.tooltip": "Keep the game window above other windows without taking focus, to watch an agent play while you work elsewhere."
+  "pendulum.config.raise_window": "Bring Game Window to Front",
+  "pendulum.config.raise_window.tooltip": "When loading finishes and whenever an agent connects, move the game window in front of other windows without taking focus. Clicking another window puts that one in front again."
 }

@@ -23,16 +23,26 @@ public final class FocusGuard {
     private FocusGuard() {
     }
 
+    private static volatile boolean raiseRequested = false;
+    private static boolean raisedAfterLoad = false;
+
     /**
-     * "Window on top" option: keep the game window above other windows without giving it focus,
-     * so the user can watch an agent play while working elsewhere. GLFW_FLOATING sets
-     * HWND_TOPMOST with SWP_NOACTIVATE on Windows, so it never steals focus and, together with
-     * the focus check below, never traps the cursor.
+     * Ask for the game window to be brought to the front on the next tick, without focus.
+     * Safe to call from any thread.
      */
-    private static void applyOnTop(long handle) {
-        boolean wanted = com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.windowOnTop.getValue();
-        boolean current = GLFW.glfwGetWindowAttrib(handle, GLFW.GLFW_FLOATING) == GLFW.GLFW_TRUE;
-        if (wanted != current) GLFW.glfwSetWindowAttrib(handle, GLFW.GLFW_FLOATING, wanted ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
+    public static void requestRaise() {
+        raiseRequested = true;
+    }
+
+    /**
+     * Bring the window to the front of the normal window stack without activating it: make it
+     * topmost and immediately not topmost again (on Windows, SetWindowPos with SWP_NOACTIVATE
+     * both times). It then behaves like any other window: the next window the user clicks goes
+     * in front of it. Focus stays where it was, so the mouse is never captured.
+     */
+    private static void raise(long handle) {
+        GLFW.glfwSetWindowAttrib(handle, GLFW.GLFW_FLOATING, GLFW.GLFW_TRUE);
+        GLFW.glfwSetWindowAttrib(handle, GLFW.GLFW_FLOATING, GLFW.GLFW_FALSE);
     }
 
     /** Call once per client tick, on the game thread. */
@@ -41,7 +51,18 @@ public final class FocusGuard {
         if (mc.getWindow() == null) return;
         long handle = mc.getWindow().getWindow();
         if (handle == 0) return;
-        applyOnTop(handle);
+
+        // "Bring game window to front" option: once when loading finishes, and on request
+        // (an agent connecting, or the window/raise tool).
+        if (!raisedAfterLoad && mc.getOverlay() == null) {
+            raisedAfterLoad = true;
+            if (com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.raiseWindow.getValue()) raiseRequested = true;
+        }
+        if (raiseRequested) {
+            raiseRequested = false;
+            raise(handle);
+        }
+
         if (!mc.isWindowActive()) return;
         if (GLFW.glfwGetWindowAttrib(handle, GLFW.GLFW_FOCUSED) == GLFW.GLFW_TRUE) return;
 

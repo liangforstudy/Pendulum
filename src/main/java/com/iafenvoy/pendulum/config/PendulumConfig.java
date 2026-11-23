@@ -23,7 +23,7 @@ public class PendulumConfig extends FileConfigContainer {
     public final BooleanEntry syncUseAttack = BooleanEntry.builder("pendulum.config.sync_use_attack", true).tooltip("pendulum.config.sync_use_attack.tooltip").key("sync_use_attack").build();
     public final BooleanEntry logJsErrors = BooleanEntry.builder("pendulum.config.log_js_errors", true).tooltip("pendulum.config.log_js_errors.tooltip").key("log_js_errors").build();
     public final BooleanEntry mcpEnabled = BooleanEntry.builder("pendulum.config.mcp_enabled", false).tooltip("pendulum.config.mcp_enabled.tooltip").key("mcp_enabled").build();
-    public final BooleanEntry windowOnTop = BooleanEntry.builder("pendulum.config.window_on_top", false).tooltip("pendulum.config.window_on_top.tooltip").key("window_on_top").build();
+    public final BooleanEntry raiseWindow = BooleanEntry.builder("pendulum.config.raise_window", false).tooltip("pendulum.config.raise_window.tooltip").key("raise_window").build();
     public final IntegerEntry mcpPort = IntegerEntry.builder("pendulum.config.mcp_port", 25566).tooltip("pendulum.config.mcp_port.tooltip").key("mcp_port").min(1024).max(65535).build();
     public final BooleanEntry allowExecuteCommand = BooleanEntry.builder("pendulum.config.allow_execute_command", true).tooltip("pendulum.config.allow_execute_command.tooltip").key("allow_execute_command").build();
     public final BooleanEntry allowSay = BooleanEntry.builder("pendulum.config.allow_say", true).tooltip("pendulum.config.allow_say.tooltip").key("allow_say").build();
@@ -42,7 +42,7 @@ public class PendulumConfig extends FileConfigContainer {
         this.createTab("mcp", "pendulum.config.category.mcp")
                 .addEntry(this.mcpEnabled)
                 .addEntry(this.mcpPort)
-                .addEntry(this.windowOnTop);
+                .addEntry(this.raiseWindow);
         this.createTab("permission", "pendulum.config.category.permission")
                 .addEntry(this.allowExecuteCommand)
                 .addEntry(this.allowSay)
