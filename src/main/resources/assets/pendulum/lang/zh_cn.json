@@ -80,5 +80,7 @@
   "pendulum.config.allow_attack": "允许攻击",
   "pendulum.config.allow_attack.tooltip": "允许脚本攻击实体。",
   "pendulum.title.script_running": "脚本运行中",
-  "pendulum.title.mcp_shared": "已与智能体共享"
+  "pendulum.title.mcp_shared": "已与智能体共享",
+  "pendulum.config.window_on_top": "Game Window on Top",
+  "pendulum.config.window_on_top.tooltip": "Keep the game window above other windows without taking focus, to watch an agent play while you work elsewhere."
 }

@@ -48,5 +48,7 @@
   "pendulum.mcp.tool.hover.param.x": "X in GUI coordinates (as in gui/enumerateWidgets; screenshot pixel / guiScale).",
   "pendulum.mcp.tool.hover.param.y": "Y in GUI coordinates (as in gui/enumerateWidgets; screenshot pixel / guiScale).",
   "pendulum.mcp.tool.scroll.param.x": "Optional X in GUI coordinates to scroll at.",
-  "pendulum.mcp.tool.scroll.param.y": "Optional Y in GUI coordinates to scroll at."
+  "pendulum.mcp.tool.scroll.param.y": "Optional Y in GUI coordinates to scroll at.",
+  "pendulum.mcp.tool.window_on_top": "Show or hide the game window on top of all other windows (it never takes focus, so the user's mouse and keyboard stay with their own window). Without 'enabled', reports the current setting. Saved to the config.",
+  "pendulum.mcp.tool.window_on_top.param.enabled": "true to keep the game window on top, false to stop."
 }

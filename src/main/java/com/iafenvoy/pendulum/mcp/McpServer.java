@@ -316,6 +316,11 @@ public final class McpServer {
                 jsonSchema("object",
                         jsonProperty("text", "string", I18n.get("pendulum.mcp.tool.select_list_item.param.text")))));
 
+        tools.add(makeTool("window/onTop",
+                I18n.get("pendulum.mcp.tool.window_on_top"),
+                jsonSchema("object",
+                        jsonProperty("enabled", "boolean", I18n.get("pendulum.mcp.tool.window_on_top.param.enabled"), false))));
+
         // ---- Utility ----
         tools.add(makeTool("wait",
                 I18n.get("pendulum.mcp.tool.wait"),
@@ -558,6 +563,15 @@ public final class McpServer {
                     }
                     break;
                 }
+                case "window/onTop": {
+                    var entry = com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.windowOnTop;
+                    if (arguments.has("enabled")) {
+                        entry.setValue(arguments.get("enabled").getAsBoolean());
+                        com.iafenvoy.pendulum.config.PendulumConfig.INSTANCE.save();
+                    }
+                    content.add(textContent("{\"windowOnTop\":" + entry.getValue() + "}"));
+                    break;
+                }
                 case "wait": {
                     double seconds = arguments.has("seconds") ? arguments.get("seconds").getAsDouble() : 1.0;
                     try { Thread.sleep((long)(seconds * 1000)); } catch (InterruptedException ignored) {}
@@ -654,6 +668,7 @@ public final class McpServer {
      * Captures a screenshot every VIDEO_FRAME_SKIP frames (~10fps @ 60fps).
      */
     public static void onClientTick() {
+        com.iafenvoy.pendulum.util.FocusGuard.tick();
         if (!videoCaptureActive) return;
         videoFrameCounter++;
         if (videoFrameCounter % VIDEO_FRAME_SKIP != 0) return;
