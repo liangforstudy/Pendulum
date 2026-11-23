@@ -43,5 +43,10 @@
   "pendulum.mcp.tool.wait.param.seconds": "等待秒数。默认 1.0。",
   "pendulum.mcp.tool.video_start": "⚠️实验性——开始约 10fps 的视频帧捕获。每 6 帧读 GPU——开销大。单次截图请用 screenshot。",
   "pendulum.mcp.tool.video_stop": "停止视频帧捕获。",
-  "pendulum.mcp.tool.video_frame": "获取最新缓存的视频帧（base64 PNG）。超过 5 秒无新帧则报错。"
+  "pendulum.mcp.tool.video_frame": "获取最新缓存的视频帧（base64 PNG）。超过 5 秒无新帧则报错。",
+  "pendulum.mcp.tool.hover": "Move the in-game cursor to GUI coordinates without clicking (the OS cursor is not moved) and report what is there: the widget, and in inventories the hovered slot with its item and full tooltip text. Tooltips also show in later screenshots.",
+  "pendulum.mcp.tool.hover.param.x": "X in GUI coordinates (as in gui/enumerateWidgets; screenshot pixel / guiScale).",
+  "pendulum.mcp.tool.hover.param.y": "Y in GUI coordinates (as in gui/enumerateWidgets; screenshot pixel / guiScale).",
+  "pendulum.mcp.tool.scroll.param.x": "Optional X in GUI coordinates to scroll at.",
+  "pendulum.mcp.tool.scroll.param.y": "Optional Y in GUI coordinates to scroll at."
 }

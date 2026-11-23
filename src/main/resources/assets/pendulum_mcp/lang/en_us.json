@@ -9,9 +9,9 @@
   "pendulum.mcp.tool.health": "Health check: reports screenshot capability, keyboard injection, Baritone availability, and script state.",
   "pendulum.mcp.tool.screenshot": "Capture a screenshot with coordinate grid overlay. Returns base64 PNG. Use optional 'path' to also save to disk.",
   "pendulum.mcp.tool.screenshot.param.path": "File path to save. Omit for base64 return only.",
-  "pendulum.mcp.tool.click": "Click at screen coordinates. Use after 'screenshot' to target UI elements. Screenshot includes a coordinate grid.",
-  "pendulum.mcp.tool.click.param.x": "X coordinate in screen pixels.",
-  "pendulum.mcp.tool.click.param.y": "Y coordinate in screen pixels.",
+  "pendulum.mcp.tool.click": "Click at GUI coordinates (as in gui/enumerateWidgets; screenshot pixel / guiScale). Uses the game's own input handlers: no window focus needed, the OS cursor is not moved.",
+  "pendulum.mcp.tool.click.param.x": "X in GUI coordinates.",
+  "pendulum.mcp.tool.click.param.y": "Y in GUI coordinates.",
   "pendulum.mcp.tool.click.param.button": "Mouse button: 'left' (default), 'right', or 'middle'.",
   "pendulum.mcp.tool.click_button": "Find a button/widget by text substring or type name and click its center. Searches recursively. Returns widget info.",
   "pendulum.mcp.tool.click_button.param.target": "Text to match (substring, case-insensitive) or widget type name.",
@@ -43,5 +43,10 @@
   "pendulum.mcp.tool.wait.param.seconds": "Seconds to wait. Default 1.0.",
   "pendulum.mcp.tool.video_start": "EXPERIMENTAL — Start ~10fps video capture. Reads GPU every 6 frames — expensive. Prefer 'screenshot' for single shots.",
   "pendulum.mcp.tool.video_stop": "Stop video frame capture.",
-  "pendulum.mcp.tool.video_frame": "Get latest cached video frame as base64 PNG. Error if no recent frame (< 5s)."
+  "pendulum.mcp.tool.video_frame": "Get latest cached video frame as base64 PNG. Error if no recent frame (< 5s).",
+  "pendulum.mcp.tool.hover": "Move the in-game cursor to GUI coordinates without clicking (the OS cursor is not moved) and report what is there: the widget, and in inventories the hovered slot with its item and full tooltip text. Tooltips also show in later screenshots.",
+  "pendulum.mcp.tool.hover.param.x": "X in GUI coordinates (as in gui/enumerateWidgets; screenshot pixel / guiScale).",
+  "pendulum.mcp.tool.hover.param.y": "Y in GUI coordinates (as in gui/enumerateWidgets; screenshot pixel / guiScale).",
+  "pendulum.mcp.tool.scroll.param.x": "Optional X in GUI coordinates to scroll at.",
+  "pendulum.mcp.tool.scroll.param.y": "Optional Y in GUI coordinates to scroll at."
 }

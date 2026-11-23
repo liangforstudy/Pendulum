@@ -6,29 +6,18 @@ import com.sun.jna.platform.win32.User32;
 import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 
-import java.awt.*;
-import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * Screen-level mouse/keyboard injection via GLFW (primary) with AWT Robot fallback.
+ * Mouse/keyboard injection through Minecraft's own GLFW callback handlers (MouseHandler,
+ * KeyboardHandler), on the game thread. Works without window focus and never moves the OS
+ * cursor or sends input to other applications.
  * Used by MCP GUI interaction tools and JS gui.click / gui.pressKey / gui.typeText.
  */
 public final class ScreenInputHelper {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static Robot awtRobot;
-
-    static {
-        try {
-            awtRobot = new Robot();
-            awtRobot.setAutoDelay(5);
-        } catch (AWTException e) {
-            // Usually a headless JVM — the GLFW path is preferred anyway, so the AWT fallback is optional.
-            LOGGER.debug("[Pendulum] AWT Robot unavailable, AWT fallback disabled: {}", e.getMessage());
-        }
-    }
 
     private ScreenInputHelper() {
     }
@@ -69,9 +58,22 @@ public final class ScreenInputHelper {
     }
 
     // ==================== Mouse ====================
+    //
+    // All mouse coordinates are GUI coordinates: the same space as gui/enumerateWidgets,
+    // Screen.mouseClicked and widget x/y (window pixels divided by the GUI scale).
+    //
+    // Input goes through Minecraft's own MouseHandler callbacks (onMove/onPress/onScroll) on
+    // the game thread, exactly as GLFW would call them. That keeps vanilla and loader events
+    // (Forge ScreenEvent, JEI overlays, slot hover, tooltips) and needs neither window focus
+    // nor the OS cursor: glfwSetCursorPos silently does nothing while the window is unfocused,
+    // and an AWT Robot would click the real desktop at the wrong place.
+
+    private static final String[] ON_MOVE = {"onMove", "m_91561_"};
+    private static final String[] ON_PRESS = {"onPress", "m_91530_"};
+    private static final String[] ON_SCROLL = {"onScroll", "m_91526_"};
 
     /**
-     * Inject a mouse button press/release at the OS level.
+     * Inject a mouse button press/release at the current cursor position.
      *
      * @param button 0=left, 1=right, 2=middle (GLFW button codes)
      * @param action 1=press, 0=release
@@ -83,96 +85,66 @@ public final class ScreenInputHelper {
     private static void injectMouseButtonNow(int button, int action) {
         Minecraft mc = Minecraft.getInstance();
         long handle = mc.getWindow().getWindow();
-
-        // Try GLFW direct injection first
-        if (handle != 0) {
-            try {
-                Object mouseHandler = getMouseHandler(mc);
-                if (mouseHandler != null) {
-                    Method target = findMouseButtonMethod(mouseHandler.getClass());
-                    if (target != null) {
-                        target.setAccessible(true);
-                        target.invoke(mouseHandler, handle, button, action, 0);
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                LOGGER.debug("[Pendulum] GLFW mouse inject failed, falling back to AWT: {}", e.getMessage());
-            }
-        }
-
-        // AWT Robot fallback
-        Robot r = awtRobot;
-        if (r == null) return;
-        int mask = button == 1 ? InputEvent.BUTTON2_DOWN_MASK
-                : button == 2 ? InputEvent.BUTTON3_DOWN_MASK
-                : InputEvent.BUTTON1_DOWN_MASK;
+        if (handle == 0) return;
         try {
-            if (action == 1) r.mousePress(mask);
-            else r.mouseRelease(mask);
+            Method m = findMethod(mc.mouseHandler.getClass(), ON_PRESS, long.class, int.class, int.class, int.class);
+            if (m != null) m.invoke(mc.mouseHandler, handle, button, action, 0);
+            else LOGGER.warn("[Pendulum] MouseHandler.onPress not found");
         } catch (Exception e) {
-            LOGGER.error("[Pendulum] AWT mouse inject failed", e);
+            LOGGER.warn("[Pendulum] Mouse button injection failed", e);
         }
     }
 
     /**
-     * Click at screen coordinates (moves cursor then injects press+release).
+     * Move the in-game cursor to GUI coordinates. Hover states and tooltips follow it.
+     */
+    public static void moveCursor(double guiX, double guiY) {
+        onGameThread(() -> moveCursorNow(guiX, guiY));
+    }
+
+    private static void moveCursorNow(double guiX, double guiY) {
+        Minecraft mc = Minecraft.getInstance();
+        long handle = mc.getWindow().getWindow();
+        if (handle == 0) return;
+        double px = guiX * mc.getWindow().getScreenWidth() / (double) mc.getWindow().getGuiScaledWidth();
+        double py = guiY * mc.getWindow().getScreenHeight() / (double) mc.getWindow().getGuiScaledHeight();
+        try {
+            Method m = findMethod(mc.mouseHandler.getClass(), ON_MOVE, long.class, double.class, double.class);
+            if (m != null) m.invoke(mc.mouseHandler, handle, px, py);
+            else LOGGER.warn("[Pendulum] MouseHandler.onMove not found");
+        } catch (Exception e) {
+            LOGGER.warn("[Pendulum] Cursor move failed", e);
+        }
+    }
+
+    /**
+     * Click at GUI coordinates (moves the cursor there, then press + release).
      *
-     * @param x      screen pixel X
-     * @param y      screen pixel Y
      * @param button 0=left, 1=right, 2=middle
      */
     public static void clickAt(int x, int y, int button) {
         moveCursor(x, y);
-
-        // Small delay for the game to process cursor move
-        sleep(30);
-
         injectMouseButton(button, 1);
         sleep(30);
         injectMouseButton(button, 0);
     }
 
-    private static void moveCursor(int x, int y) {
-        onGameThread(() -> {
-            Minecraft mc = Minecraft.getInstance();
-            long handle = mc.getWindow().getWindow();
-
-            // Move cursor via GLFW
-            if (handle != 0) {
-                try {
-                    Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
-                    Method setPos = glfwClass.getMethod("glfwSetCursorPos", long.class, double.class, double.class);
-                    setPos.invoke(null, handle, (double) x, (double) y);
-                } catch (Exception e) {
-                    // Fall back to AWT
-                    Robot r = awtRobot;
-                    if (r != null) r.mouseMove(x, y);
-                }
-            }
-        });
-    }
-
     /**
-     * Drag mouse from (x1,y1) to (x2,y2).
+     * Drag the mouse between two GUI points.
      */
     public static void mouseDrag(int x1, int y1, int x2, int y2, int button) {
-        clickAt(x1, y1, 0); // move to start
+        moveCursor(x1, y1);
         injectMouseButton(button, 1);
-        // Move in steps for smooth drag
-        int steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) / 5;
-        if (steps < 5) steps = 5;
+        int steps = Math.max(5, Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) / 5);
         for (int i = 1; i <= steps; i++) {
-            int cx = x1 + (x2 - x1) * i / steps;
-            int cy = y1 + (y2 - y1) * i / steps;
-            moveCursor(cx, cy);
+            moveCursor(x1 + (x2 - x1) * (double) i / steps, y1 + (y2 - y1) * (double) i / steps);
             sleep(10);
         }
         injectMouseButton(button, 0);
     }
 
     /**
-     * Scroll mouse wheel.
+     * Scroll the mouse wheel at the current cursor position.
      *
      * @param clicks positive=up, negative=down
      */
@@ -183,33 +155,45 @@ public final class ScreenInputHelper {
     private static void scrollNow(int clicks) {
         Minecraft mc = Minecraft.getInstance();
         long handle = mc.getWindow().getWindow();
+        if (handle == 0) return;
+        try {
+            Method m = findMethod(mc.mouseHandler.getClass(), ON_SCROLL, long.class, double.class, double.class);
+            if (m != null) m.invoke(mc.mouseHandler, handle, 0.0, (double) clicks);
+            else LOGGER.warn("[Pendulum] MouseHandler.onScroll not found");
+        } catch (Exception e) {
+            LOGGER.warn("[Pendulum] Scroll failed", e);
+        }
+    }
 
-        if (handle != 0) {
+    /**
+     * Find a declared method by any of its names (Mojang name first, then the SRG name a
+     * normal Forge 1.20.1 game uses) and exact parameter types; made accessible.
+     */
+    static Method findMethod(Class<?> clazz, String[] names, Class<?>... params) {
+        for (String name : names) {
             try {
-                Object mouseHandler = getMouseHandler(mc);
-                if (mouseHandler != null) {
-                    for (Method m : mouseHandler.getClass().getDeclaredMethods()) {
-                        if (m.getName().equals("onScroll") && m.getParameterCount() == 3) {
-                            m.setAccessible(true);
-                            // GLFW scroll callback: onScroll(long window, double xoffset, double yoffset)
-                            m.invoke(mouseHandler, handle, 0.0, (double) clicks);
-                            return;
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                LOGGER.debug("[Pendulum] GLFW scroll failed: {}", e.getMessage());
+                Method m = clazz.getDeclaredMethod(name, params);
+                m.setAccessible(true);
+                return m;
+            } catch (NoSuchMethodException ignored) {
             }
         }
+        return null;
+    }
 
-        // AWT Robot scroll fallback
-        Robot r = awtRobot;
-        if (r != null) {
-            int amount = clicks > 0 ? clicks : -clicks;
-            for (int i = 0; i < amount; i++) {
-                r.mouseWheel(clicks > 0 ? -1 : 1);
+    /** Same as {@link #findMethod} for fields, searching superclasses too. */
+    public static Field findField(Class<?> clazz, String... names) {
+        for (Class<?> c = clazz; c != null; c = c.getSuperclass()) {
+            for (String name : names) {
+                try {
+                    Field f = c.getDeclaredField(name);
+                    f.setAccessible(true);
+                    return f;
+                } catch (NoSuchFieldException ignored) {
+                }
             }
         }
+        return null;
     }
 
     // ==================== Keyboard ====================
@@ -217,7 +201,6 @@ public final class ScreenInputHelper {
     /**
      * Inject a keyboard key via Minecraft's keyboard handler + Win32 PostMessage fallback.
      * NO AWT Robot — prevents keystroke leakage to other applications.
-     * Forces Minecraft window focus before injection.
      */
     public static void injectKey(String keyName, int action) {
         int glfwKey = parseKeyName(keyName);
@@ -226,24 +209,9 @@ public final class ScreenInputHelper {
             return;
         }
 
-        // Force window focus first, then let it settle (off the render thread).
-        focusWindow();
-        sleep(30);
-
+        // No focus change: KeyboardHandler.keyPress works while the window is in the background,
+        // and stealing focus would interrupt whatever the user is doing.
         onGameThread(() -> injectKeyNow(keyName, glfwKey, action));
-    }
-
-    private static void focusWindow() {
-        onGameThread(() -> {
-            Minecraft mc = Minecraft.getInstance();
-            long handle = mc.getWindow().getWindow();
-            if (handle == 0) return;
-            try {
-                Class<?> glfw = Class.forName("org.lwjgl.glfw.GLFW");
-                glfw.getMethod("glfwFocusWindow", long.class).invoke(null, handle);
-            } catch (Exception ignored) {
-            }
-        });
     }
 
     private static void injectKeyNow(String keyName, int glfwKey, int action) {
@@ -322,17 +290,27 @@ public final class ScreenInputHelper {
     }
 
     private static void typeChar(char c) {
-        // Map char to GLFW key code, inject press+release
+        // Text fields only take characters from charTyped (the GLFW char callback); keyPress
+        // alone never inserts text. The key event is sent too, for screens that react to keys.
         int glfwKey = charToGlfwKey(c);
-        if (glfwKey > 0) {
-            boolean shift = Character.isUpperCase(c) || "!@#$%^&*()_+{}|:\"<>?~".indexOf(c) >= 0;
-            if (shift) injectKey("LEFT_SHIFT", 1);
-            injectKeyRaw(glfwKey, 1);
-            sleep(10);
-            injectKeyRaw(glfwKey, 0);
-            if (shift) injectKey("LEFT_SHIFT", 0);
-            sleep(10);
-        }
+        if (glfwKey > 0) injectKeyRaw(glfwKey, 1);
+        injectCharRaw(c);
+        if (glfwKey > 0) injectKeyRaw(glfwKey, 0);
+        sleep(10);
+    }
+
+    private static void injectCharRaw(char c) {
+        onGameThreadLater(() -> {
+            Minecraft mc = Minecraft.getInstance();
+            long handle = mc.getWindow().getWindow();
+            if (handle == 0) return;
+            try {
+                Method m = findCharTypedMethod(mc.keyboardHandler.getClass());
+                if (m != null) m.invoke(mc.keyboardHandler, handle, (int) c, 0);
+            } catch (Exception e) {
+                LOGGER.debug("[Pendulum] char injection failed for {}", c, e);
+            }
+        });
     }
 
     private static void injectKeyRaw(int glfwKey, int action) {
@@ -386,34 +364,12 @@ public final class ScreenInputHelper {
         return mc.keyboardHandler;
     }
 
-    private static Method findMouseButtonMethod(Class<?> clazz) {
-        for (Method m : clazz.getDeclaredMethods()) {
-            if (m.getName().equals("onPress") && m.getParameterCount() == 4) {
-                Class<?>[] pt = m.getParameterTypes();
-                if (pt[0] == long.class && pt[1] == int.class && pt[2] == int.class && pt[3] == int.class) {
-                    return m;
-                }
-            }
-        }
-        // Alternative name
-        for (Method m : clazz.getDeclaredMethods()) {
-            if ((m.getName().equals("mouseButtonCallback") || m.getName().contains("Button"))
-                    && m.getParameterCount() == 4) {
-                Class<?>[] pt = m.getParameterTypes();
-                if (pt[0] == long.class) return m;
-            }
-        }
-        return null;
+    private static Method findKeyPressMethod(Class<?> clazz) {
+        return findMethod(clazz, new String[]{"keyPress", "m_90893_"}, long.class, int.class, int.class, int.class, int.class);
     }
 
-    private static Method findKeyPressMethod(Class<?> clazz) {
-        for (Method m : clazz.getDeclaredMethods()) {
-            if (m.getName().equals("keyPress") && m.getParameterCount() == 5) {
-                Class<?>[] pt = m.getParameterTypes();
-                if (pt[0] == long.class && pt[1] == int.class) return m;
-            }
-        }
-        return null;
+    private static Method findCharTypedMethod(Class<?> clazz) {
+        return findMethod(clazz, new String[]{"charTyped", "m_90889_"}, long.class, int.class, int.class);
     }
 
     // ==================== Key name parsing ====================

@@ -253,6 +253,12 @@ public final class McpServer {
                 jsonSchema("object",
                         jsonProperty("target", "string", I18n.get("pendulum.mcp.tool.click_button.param.target")))));
 
+        tools.add(makeTool("gui/hover",
+                I18n.get("pendulum.mcp.tool.hover"),
+                jsonSchema("object",
+                        jsonProperty("x", "integer", I18n.get("pendulum.mcp.tool.hover.param.x")),
+                        jsonProperty("y", "integer", I18n.get("pendulum.mcp.tool.hover.param.y")))));
+
         tools.add(makeTool("gui/enumerateWidgets",
                 I18n.get("pendulum.mcp.tool.enumerate_widgets"),
                 jsonSchema("object", jsonProperty("_", "string", I18n.get("pendulum.mcp.tool.no_params")))));
@@ -282,7 +288,9 @@ public final class McpServer {
         tools.add(makeTool("simulate/scroll",
                 I18n.get("pendulum.mcp.tool.scroll"),
                 jsonSchema("object",
-                        jsonProperty("clicks", "integer", I18n.get("pendulum.mcp.tool.scroll.param.clicks")))));
+                        jsonProperty("clicks", "integer", I18n.get("pendulum.mcp.tool.scroll.param.clicks")),
+                        jsonProperty("x", "integer", I18n.get("pendulum.mcp.tool.scroll.param.x"), false),
+                        jsonProperty("y", "integer", I18n.get("pendulum.mcp.tool.scroll.param.y"), false))));
 
         tools.add(makeTool("simulate/hotkey",
                 I18n.get("pendulum.mcp.tool.hotkey"),
@@ -398,7 +406,9 @@ public final class McpServer {
                         h.addProperty("screenshot", false);
                         h.addProperty("screenshotError", e.getMessage());
                     }
-                    h.addProperty("keyboardInjection", "GLFW only (Minecraft window focus required)");
+                    h.addProperty("input", "Minecraft's own mouse/keyboard handlers: no window focus needed, OS cursor untouched");
+                    h.addProperty("coordinates", "GUI coordinates (as in gui/enumerateWidgets) = screenshot pixels / guiScale");
+                    h.addProperty("guiScale", ScriptEngine.submitToGameThread(() -> Minecraft.getInstance().getWindow().getGuiScale()));
                     content.add(textContent(GSON.toJson(h)));
                     break;
                 }
@@ -409,6 +419,8 @@ public final class McpServer {
                     } else {
                         // Always return base64 image
                         content.add(imageContent(b64, "image/png"));
+                        double scale = ScriptEngine.submitToGameThread(() -> Minecraft.getInstance().getWindow().getGuiScale());
+                        content.add(textContent("{\"guiScale\":" + scale + ",\"note\":\"Click, hover and scroll take GUI coordinates: screenshot pixel / guiScale.\"}"));
                         // Optionally save to disk
                         String path = arguments.has("path") ? arguments.get("path").getAsString() : null;
                         if (path != null && !path.isEmpty()) {
@@ -438,6 +450,15 @@ public final class McpServer {
                         String r = ScriptEngine.submitToGameThread(() -> clickWidgetByText(target));
                         content.add(textContent(r));
                     }
+                    break;
+                }
+                case "gui/hover": {
+                    int x = arguments.has("x") ? arguments.get("x").getAsInt() : 0;
+                    int y = arguments.has("y") ? arguments.get("y").getAsInt() : 0;
+                    ScreenInputHelper.moveCursor(x, y);
+                    // Hovered slot and widget hover state update during rendering: let a few frames pass.
+                    try { Thread.sleep(150); } catch (InterruptedException ignored) {}
+                    content.add(textContent(ScriptEngine.submitToGameThread(() -> describeHover(x, y))));
                     break;
                 }
                 case "gui/enumerateWidgets": {
@@ -487,6 +508,8 @@ public final class McpServer {
                 }
                 case "simulate/scroll": {
                     int clicks = arguments.has("clicks") ? arguments.get("clicks").getAsInt() : 0;
+                    if (arguments.has("x") && arguments.has("y"))
+                        ScreenInputHelper.moveCursor(arguments.get("x").getAsInt(), arguments.get("y").getAsInt());
                     ScreenInputHelper.scroll(clicks);
                     content.add(textContent("Scrolled " + clicks));
                     break;
@@ -852,6 +875,71 @@ public final class McpServer {
         }
 
         return obj;
+    }
+
+    /**
+     * Describe what is under the in-game cursor at GUI (x, y): the screen, the widget there and,
+     * in container screens, the hovered slot with its item and full tooltip text.
+     */
+    private static String describeHover(int x, int y) {
+        Minecraft mc = Minecraft.getInstance();
+        JsonObject o = new JsonObject();
+        o.addProperty("x", x);
+        o.addProperty("y", y);
+        if (mc.screen == null) {
+            o.addProperty("screen", (String) null);
+            return GSON.toJson(o);
+        }
+        o.addProperty("screen", mc.screen.getTitle().getString());
+        o.addProperty("screenClass", mc.screen.getClass().getSimpleName());
+
+        Object w = findWidgetAt(mc.screen.children(), x, y);
+        if (w instanceof AbstractWidget aw) {
+            JsonObject wj = new JsonObject();
+            wj.addProperty("type", aw.getClass().getSimpleName());
+            wj.addProperty("text", aw.getMessage().getString());
+            wj.addProperty("active", aw.active);
+            o.add("widget", wj);
+        }
+
+        if (mc.screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> cs) {
+            try {
+                java.lang.reflect.Field f = ScreenInputHelper.findField(cs.getClass(), "hoveredSlot", "f_97734_");
+                Object slotObj = f != null ? f.get(cs) : null;
+                if (slotObj instanceof net.minecraft.world.inventory.Slot slot) {
+                    JsonObject sj = new JsonObject();
+                    sj.addProperty("index", slot.index);
+                    sj.addProperty("containerSlot", slot.getContainerSlot());
+                    net.minecraft.world.item.ItemStack stack = slot.getItem();
+                    sj.addProperty("empty", stack.isEmpty());
+                    if (!stack.isEmpty()) {
+                        sj.addProperty("item", net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
+                        sj.addProperty("count", stack.getCount());
+                        sj.addProperty("name", stack.getHoverName().getString());
+                        JsonArray lines = new JsonArray();
+                        for (net.minecraft.network.chat.Component c : net.minecraft.client.gui.screens.Screen.getTooltipFromItem(mc, stack))
+                            lines.add(c.getString());
+                        sj.add("tooltip", lines);
+                    }
+                    o.add("slot", sj);
+                }
+            } catch (Exception e) {
+                o.addProperty("slotError", e.toString());
+            }
+        }
+        return GSON.toJson(o);
+    }
+
+    private static Object findWidgetAt(java.util.List<?> children, int x, int y) {
+        for (Object child : children) {
+            java.util.List<?> sub = com.iafenvoy.pendulum.api.GuiAPI.tryGetChildren(child);
+            if (sub != null) {
+                Object found = findWidgetAt(sub, x, y);
+                if (found != null) return found;
+            }
+            if (child instanceof AbstractWidget w && w.visible && w.isMouseOver(x, y)) return child;
+        }
+        return null;
     }
 
     /**
